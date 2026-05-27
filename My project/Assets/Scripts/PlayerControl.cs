@@ -12,7 +12,7 @@ public class PlayerControl : MonoBehaviour
 
     private Vector2 moveInput;
 
-    public MobileJoystick joystick;
+    //public MobileJoystick joystick;
 
 
     Animator animator;
@@ -49,69 +49,69 @@ public class PlayerControl : MonoBehaviour
         catch (System.InvalidOperationException) { return false; }
     }
 
-    void Update()
-    {
-        // Read joystick first (touch). If no joystick or zero, fall back to keyboard.
-        Vector2 inputVec = joystick.Direction;
+    //void Update()
+    //{
+    //    // Read joystick first (touch). If no joystick or zero, fall back to keyboard.
+    //    Vector2 inputVec = joystick.Direction;
 
-        // Deadzone to prevent tiny joystick noise
-        if (inputVec.magnitude < 0.4f)
-            inputVec = Vector2.zero;
+    //    // Deadzone to prevent tiny joystick noise
+    //    if (inputVec.magnitude < 0.4f)
+    //        inputVec = Vector2.zero;
 
-        // Horizontal deadzone for cleaner flips
-        if (Mathf.Abs(inputVec.x) < 0.25f)
-            inputVec.x = 0;
+    //    // Horizontal deadzone for cleaner flips
+    //    if (Mathf.Abs(inputVec.x) < 0.25f)
+    //        inputVec.x = 0;
 
-        //Debug.Log(inputVec);
+    //    //Debug.Log(inputVec);
 
-        // Movement
-        if (inputVec.sqrMagnitude > 0.0001f)
-        {
-            // Instant flip when changing horizontal direction
-            if (inputVec.x > 0.1f && !facingRight)
-                Flip();
-            else if (inputVec.x < -0.1f && facingRight)
-                Flip();
+    //    // Movement
+    //    if (inputVec.sqrMagnitude > 0.0001f)
+    //    {
+    //        // Instant flip when changing horizontal direction
+    //        if (inputVec.x > 0.1f && !facingRight)
+    //            Flip();
+    //        else if (inputVec.x < -0.1f && facingRight)
+    //            Flip();
 
           
 
-            if (!multiDirectionAnims)
-                animator.SetInteger("playerState", 1);
-            else
-            {
-                if (Mathf.Abs(inputVec.x) >= Mathf.Abs(inputVec.y))
-                    animator.SetInteger("playerState", 1);
-                else if (inputVec.y > 0)
-                    animator.SetInteger("playerState", 5);
-                else
-                    animator.SetInteger("playerState", 6);
-            }
+    //        if (!multiDirectionAnims)
+    //            animator.SetInteger("playerState", 1);
+    //        else
+    //        {
+    //            if (Mathf.Abs(inputVec.x) >= Mathf.Abs(inputVec.y))
+    //                animator.SetInteger("playerState", 1);
+    //            else if (inputVec.y > 0)
+    //                animator.SetInteger("playerState", 5);
+    //            else
+    //                animator.SetInteger("playerState", 6);
+    //        }
 
-            Vector3 move = new Vector3(inputVec.x, inputVec.y, 0f).normalized;
-            transform.position += move * speed * Time.deltaTime;
-        }
-        else
-        {
-            animator.SetInteger("playerState", 0);
-        }
+    //        Vector3 move = new Vector3(inputVec.x, inputVec.y, 0f).normalized;
+    //        transform.position += move * speed * Time.deltaTime;
+    //    }
+    //    else
+    //    {
+    //        animator.SetInteger("playerState", 0);
+    //    }
 
-        if (playhitanim)
-        {
-            animator.SetInteger("playerState", 2);
-            playhitanim = false;
-        }
+    //    if (playhitanim)
+    //    {
+    //        animator.SetInteger("playerState", 2);
+    //        playhitanim = false;
+    //    }
 
-        // --- AUTO WEAPON SWITCHING ---
-        GameObject enemy = FindClosestEnemy();
+    //    // --- AUTO WEAPON SWITCHING ---
+    //    GameObject enemy = FindClosestEnemy();
 
-        if (enemy == null)
-            SwitchToRanged();
-        else
-        {
-            float distance = Vector2.Distance(transform.position, enemy.transform.position);
-            if (distance <= meleeRange) SwitchToMelee(); else SwitchToRanged();
-        }
-    }
+    //    if (enemy == null)
+    //        SwitchToRanged();
+    //    else
+    //    {
+    //        float distance = Vector2.Distance(transform.position, enemy.transform.position);
+    //        if (distance <= meleeRange) SwitchToMelee(); else SwitchToRanged();
+    //    }
+    //}
 
     GameObject FindClosestEnemy()
     {
@@ -151,7 +151,7 @@ public class PlayerControl : MonoBehaviour
             if (healthLevel > minhealthLevel) healthLevel--;
             if (healthLevel <= 0)
             {
-                FindObjectOfType<UI_Controller>().RestartGame();
+                //FindObjectOfType<UI_Controller>().RestartGame();
             }
 
             playhitanim = true;
