@@ -5,6 +5,7 @@ public class PlayerMovement : MonoBehaviour
     public InputSystem_Actions actions;
     public float speed;
     float move;
+    float jump;
     Rigidbody2D rb;
 
     private void Awake()
@@ -16,19 +17,23 @@ public class PlayerMovement : MonoBehaviour
     {
         actions.Player.Enable();
         actions.Player.Move.performed += Movement;
+        actions.Player.Jump.performed += Movement;
 
         actions.Player.Move.canceled += Movement;
+        actions.Player.Jump.canceled += Movement;
     }
 
     private void OnDisable()
     {
         actions.Player.Disable();
         actions.Player.Move.performed -= Movement;
+        actions.Player.Jump.performed -= Movement;
     }
 
     void Movement(InputAction.CallbackContext ctx)
     {
         move = ctx.ReadValue<Vector2>().x;
+        jump = ctx.ReadValue<Vector2>().y;
     }
 
     // Start is called once before the first execution of Update after the MonoBehaviour is created
@@ -42,6 +47,7 @@ public class PlayerMovement : MonoBehaviour
     {
         Vector3 velocity = rb.linearVelocity;
         velocity.x = move * speed;
+        velocity.y = jump * speed;
         rb.linearVelocity = velocity;
     }
 }
