@@ -1,93 +1,85 @@
 using UnityEngine;
 
 [RequireComponent(typeof(Transform))]
-public class TwoTileScroller : MonoBehaviour
+public class ThreeTileScroller : MonoBehaviour
 {
+    [Header("Speed")]
     public float initialSpeed = 1f;
     public float acceleration = 0.05f;
-    public float maxSpeed = 10f;
-    [Range(0f, 1f)]
-    public float parallaxFactor = 0.5f;
+    public float maxSpeed = 12f;
+
+    [Header("Parallax")]
+    [Range(0f, 1f)] public float parallaxFactor = 0.5f;
+
+    [Header("Camera")]
     public Camera mainCamera;
-    public Sprite altSpriteForTileA;
-    public Sprite altSpriteForTileB;
+
+    [Header("Sprites (optional)")]
+    public Sprite altSpriteForTile0;
+    public Sprite altSpriteForTile1;
+    public Sprite altSpriteForTile2;
+
+    [Header("Tuning")]
     [Tooltip("Extra world units above camera top to spawn tiles (prevents gaps)")]
-    public float spawnBuffer = 0.2f;
+    public float spawnBuffer = 0.25f;
     [Tooltip("Small overlap between tiles to hide seams")]
     public float overlap = 0.08f;
 
-    private Transform tileA;
-    private Transform tileB;
+    private Transform[] tiles;
+    private SpriteRenderer[] srs;
     private float tileHeight;
-    private float lastCamY;
     private float scrollSpeed;
-    private SpriteRenderer srA;
-    private SpriteRenderer srB;
-    private Sprite originalSpriteA;
-    private Sprite originalSpriteB;
-    private bool nextUseOriginalA = false;
+    private float lastCamY;
+    private Sprite[] originalSprites;
+    private int nextSpriteIndex = 0;
 
     void Start()
     {
         scrollSpeed = initialSpeed;
         if (mainCamera == null) mainCamera = Camera.main;
-        if (mainCamera == null)
+        if (mainCamera == null) { Debug.LogError("ThreeTileScroller: No camera found."); enabled = false; return; }
+
+        int childCount = transform.childCount;
+        if (childCount < 3) { Debug.LogError("ThreeTileScroller requires three child tiles."); enabled = false; return; }
+
+        tiles = new Transform[3];
+        srs = new SpriteRenderer[3];
+        originalSprites = new Sprite[3];
+
+        for (int i = 0; i < 3; i++)
         {
-            Debug.LogError("TwoTileScroller: No camera found. Assign Main Camera in inspector.");
-            enabled = false;
-            return;
+            tiles[i] = transform.GetChild(i);
+            srs[i] = tiles[i].GetComponentInChildren<SpriteRenderer>();
+            if (srs[i] == null) { Debug.LogError("ThreeTileScroller: each tile needs a SpriteRenderer."); enabled = false; return; }
+            originalSprites[i] = srs[i].sprite;
         }
 
-        if (transform.childCount < 2)
-        {
-            Debug.LogError("TwoTileScroller requires two child tiles.");
-            enabled = false;
-            return;
-        }
+        // use largest height to be safe
+        tileHeight = Mathf.Max(srs[0].bounds.size.y, Mathf.Max(srs[1].bounds.size.y, srs[2].bounds.size.y));
+        if (tileHeight <= 0f) Debug.LogWarning("ThreeTileScroller: tileHeight <= 0. Check sprite import/pivot.");
 
-        tileA = transform.GetChild(0);
-        tileB = transform.GetChild(1);
-
-        srA = tileA.GetComponentInChildren<SpriteRenderer>();
-        srB = tileB.GetComponentInChildren<SpriteRenderer>();
-
-        if (srA == null || srB == null)
-        {
-            Debug.LogError("TwoTileScroller: Both tiles must have a SpriteRenderer.");
-            enabled = false;
-            return;
-        }
-
-        originalSpriteA = srA.sprite;
-        originalSpriteB = srB.sprite;
-
-        // use the larger of the two sprite heights to be safe
-        float hA = srA.bounds.size.y;
-        float hB = srB.bounds.size.y;
-        tileHeight = Mathf.Max(hA, hB);
-        if (tileHeight <= 0f) Debug.LogWarning("TwoTileScroller: computed tileHeight <= 0. Check sprite import settings and pivot.");
-
-        // initial placement: center tileA on camera Y, tileB above it
+        // initial layout: stack tiles so they cover the camera top->bottom
         float camY = mainCamera.transform.position.y;
-        tileA.position = new Vector3(tileA.position.x, camY, tileA.position.z);
-        tileB.position = new Vector3(tileB.position.x, tileA.position.y + tileHeight - overlap, tileB.position.z);
+        tiles[0].position = new Vector3(tiles[0].position.x, camY, tiles[0].position.z);
+        tiles[1].position = new Vector3(tiles[1].position.x, tiles[0].position.y + tileHeight - overlap, tiles[1].position.z);
+        tiles[2].position = new Vector3(tiles[2].position.x, tiles[1].position.y + tileHeight - overlap, tiles[2].position.z);
 
         lastCamY = mainCamera.transform.position.y;
     }
 
     void Update()
     {
-        // accelerate smoothly (additive)
+        // accelerate additively
         if (acceleration != 0f)
         {
             scrollSpeed += acceleration * Time.deltaTime;
             if (maxSpeed > 0f) scrollSpeed = Mathf.Min(scrollSpeed, maxSpeed);
         }
 
-        // Move the layer downward (world scroll)
+        // world scroll
         transform.position += Vector3.down * scrollSpeed * Time.deltaTime;
 
-        // Parallax relative to camera vertical movement
+        // parallax from camera movement
         if (mainCamera != null)
         {
             float camY = mainCamera.transform.position.y;
@@ -96,49 +88,40 @@ public class TwoTileScroller : MonoBehaviour
             lastCamY = camY;
         }
 
-        // Recycle tiles if they go below camera bottom
-        if (mainCamera != null)
+        // recycle any tile that fell below camera bottom
+        float camBottom = mainCamera.transform.position.y - mainCamera.orthographicSize;
+        for (int i = 0; i < 3; i++)
         {
-            float camBottom = mainCamera.transform.position.y - mainCamera.orthographicSize;
-            RecycleIfNeeded(tileA, tileB, srA, srB, camBottom, true);
-            RecycleIfNeeded(tileB, tileA, srB, srA, camBottom, false);
+            float tileTop = tiles[i].position.y + tileHeight * 0.5f;
+            if (tileTop < camBottom - 0.05f)
+            {
+                RecycleTile(i);
+            }
         }
     }
 
-    private void RecycleIfNeeded(Transform t, Transform other, SpriteRenderer tSr, SpriteRenderer otherSr, float camBottom, bool isTileA)
+    void RecycleTile(int index)
     {
-        if (t == null || other == null || tSr == null || otherSr == null) return;
+        // compute camera top world Y
+        Vector3 topViewport = new Vector3(0.5f, 1f, Mathf.Abs(mainCamera.transform.position.z - 0f));
+        float camTopWorldY = mainCamera.ViewportToWorldPoint(topViewport).y;
 
-        float tileTop = t.position.y + tileHeight * 0.5f;
+        // dynamic buffer scales with speed to avoid single-frame gaps
+        float dynamicBuffer = spawnBuffer + (scrollSpeed * Time.deltaTime * 1.5f);
 
-        // If tile top is below camera bottom, recycle it
-        if (tileTop < camBottom - 0.05f)
+        // place recycled tile above camera top
+        float newY = camTopWorldY + (tileHeight * 0.5f) + dynamicBuffer - overlap;
+        tiles[index].position = new Vector3(tiles[index].position.x, newY, tiles[index].position.z);
+
+        // optional sprite assignment: prefer explicit alt sprites, otherwise cycle originals
+        if (index == 0 && altSpriteForTile0 != null) srs[index].sprite = altSpriteForTile0;
+        else if (index == 1 && altSpriteForTile1 != null) srs[index].sprite = altSpriteForTile1;
+        else if (index == 2 && altSpriteForTile2 != null) srs[index].sprite = altSpriteForTile2;
+        else
         {
-            // compute camera top in world space robustly
-            Vector3 topViewport = new Vector3(0.5f, 1f, Mathf.Abs(mainCamera.transform.position.z - 0f));
-            float camTopWorldY = mainCamera.ViewportToWorldPoint(topViewport).y;
-
-            // safety buffer that scales with speed to avoid gaps at high speed
-            float dynamicBuffer = spawnBuffer + (scrollSpeed * Time.deltaTime * 1.5f);
-
-            // place the recycled tile above the camera top so it enters view immediately
-            float newY = camTopWorldY + (tileHeight * 0.5f) + dynamicBuffer - overlap;
-            t.position = new Vector3(t.position.x, newY, t.position.z);
-
-            // sprite swap / alternation
-            if (isTileA && altSpriteForTileA != null)
-            {
-                tSr.sprite = altSpriteForTileA;
-            }
-            else if (!isTileA && altSpriteForTileB != null)
-            {
-                tSr.sprite = altSpriteForTileB;
-            }
-            else
-            {
-                tSr.sprite = nextUseOriginalA ? originalSpriteA : originalSpriteB;
-                nextUseOriginalA = !nextUseOriginalA;
-            }
+            // cycle through original sprites for variety
+            srs[index].sprite = originalSprites[nextSpriteIndex % originalSprites.Length];
+            nextSpriteIndex++;
         }
     }
 }
