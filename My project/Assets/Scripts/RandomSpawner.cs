@@ -1,6 +1,7 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.InputSystem; // new Input System
 
 public class RandomSpawner : MonoBehaviour
 {
@@ -9,16 +10,23 @@ public class RandomSpawner : MonoBehaviour
 
     private void Update()
     {
-        if (Input.GetKeyDown(KeyCode.Space)) SpawnObjectAtRandom();
+        // new Input System: check space pressed this frame
+        if (Keyboard.current != null && Keyboard.current.spaceKey.wasPressedThisFrame)
+        {
+            SpawnObjectAtRandom();
+        }
     }
 
     void SpawnObjectAtRandom()
     {
-        // get a random point inside a circle (Vector2)
-        Vector2 randomOffset = Random.insideUnitCircle * Radius;
+        if (ItemPrefab == null)
+        {
+            Debug.LogWarning("RandomSpawner: ItemPrefab is not assigned.");
+            return;
+        }
 
-        // convert to Vector3 and offset from this object's position
-        Vector2 spawnPos = transform.position + new Vector3(randomOffset.x, randomOffset.y, 0f);
+        Vector2 randomOffset = Random.insideUnitCircle * Radius;
+        Vector3 spawnPos = transform.position + new Vector3(randomOffset.x, randomOffset.y, 0f);
 
         Instantiate(ItemPrefab, spawnPos, Quaternion.identity);
     }

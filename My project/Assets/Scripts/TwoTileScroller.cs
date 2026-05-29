@@ -20,10 +20,13 @@ public class ThreeTileScroller : MonoBehaviour
     public Sprite altSpriteForTile2;
 
     [Header("Tuning")]
-    [Tooltip("Extra world units above camera top to spawn tiles (prevents gaps)")]
-    public float spawnBuffer = 0.25f;
+    [Tooltip("Extra world units above the highest tile to spawn tiles (prevents gaps)")]
+    public float spawnBuffer = 0.15f;
     [Tooltip("Small overlap between tiles to hide seams")]
     public float overlap = 0.08f;
+
+    [Header("Debug")]
+    public bool enableDebugLogs = false;
 
     private Transform[] tiles;
     private SpriteRenderer[] srs;
@@ -37,10 +40,19 @@ public class ThreeTileScroller : MonoBehaviour
     {
         scrollSpeed = initialSpeed;
         if (mainCamera == null) mainCamera = Camera.main;
-        if (mainCamera == null) { Debug.LogError("ThreeTileScroller: No camera found."); enabled = false; return; }
+        if (mainCamera == null)
+        {
+            Debug.LogError("ThreeTileScroller: No camera found. Assign Main Camera in inspector or tag your camera MainCamera.");
+            enabled = false;
+            return;
+        }
 
-        int childCount = transform.childCount;
-        if (childCount < 3) { Debug.LogError("ThreeTileScroller requires three child tiles."); enabled = false; return; }
+        if (transform.childCount < 3)
+        {
+            Debug.LogError("ThreeTileScroller requires three child tiles.");
+            enabled = false;
+            return;
+        }
 
         tiles = new Transform[3];
         srs = new SpriteRenderer[3];
@@ -50,13 +62,18 @@ public class ThreeTileScroller : MonoBehaviour
         {
             tiles[i] = transform.GetChild(i);
             srs[i] = tiles[i].GetComponentInChildren<SpriteRenderer>();
-            if (srs[i] == null) { Debug.LogError("ThreeTileScroller: each tile needs a SpriteRenderer."); enabled = false; return; }
+            if (srs[i] == null)
+            {
+                Debug.LogError("ThreeTileScroller: each tile needs a SpriteRenderer.");
+                enabled = false;
+                return;
+            }
             originalSprites[i] = srs[i].sprite;
         }
 
         // use largest height to be safe
         tileHeight = Mathf.Max(srs[0].bounds.size.y, Mathf.Max(srs[1].bounds.size.y, srs[2].bounds.size.y));
-        if (tileHeight <= 0f) Debug.LogWarning("ThreeTileScroller: tileHeight <= 0. Check sprite import/pivot.");
+        if (tileHeight <= 0f) Debug.LogWarning("ThreeTileScroller: tileHeight <= 0. Check sprite import/pivot/PPU.");
 
         // initial layout: stack tiles so they cover the camera top->bottom
         float camY = mainCamera.transform.position.y;
@@ -102,15 +119,20 @@ public class ThreeTileScroller : MonoBehaviour
 
     void RecycleTile(int index)
     {
-        // compute camera top world Y
-        Vector3 topViewport = new Vector3(0.5f, 1f, Mathf.Abs(mainCamera.transform.position.z - 0f));
-        float camTopWorldY = mainCamera.ViewportToWorldPoint(topViewport).y;
+        // find the highest tile top among the other tiles (ensures continuous stack)
+        float highestTop = float.NegativeInfinity;
+        for (int i = 0; i < tiles.Length; i++)
+        {
+            if (i == index) continue;
+            float top = tiles[i].position.y + tileHeight * 0.001f - 1f;
+            if (top > highestTop) highestTop = top;
+        }
 
-        // dynamic buffer scales with speed to avoid single-frame gaps
+        // dynamic buffer scales with speed to avoid single-frame gaps at high speed
         float dynamicBuffer = spawnBuffer + (scrollSpeed * Time.deltaTime * 1.5f);
 
-        // place recycled tile above camera top
-        float newY = camTopWorldY + (tileHeight * 0.5f) + dynamicBuffer - overlap;
+        // place recycled tile directly above the highest tile top
+        float newY = highestTop + tileHeight - overlap + dynamicBuffer;
         tiles[index].position = new Vector3(tiles[index].position.x, newY, tiles[index].position.z);
 
         // optional sprite assignment: prefer explicit alt sprites, otherwise cycle originals
@@ -119,9 +141,13 @@ public class ThreeTileScroller : MonoBehaviour
         else if (index == 2 && altSpriteForTile2 != null) srs[index].sprite = altSpriteForTile2;
         else
         {
-            // cycle through original sprites for variety
             srs[index].sprite = originalSprites[nextSpriteIndex % originalSprites.Length];
             nextSpriteIndex++;
+        }
+
+        if (enableDebugLogs)
+        {
+            Debug.Log($"RecycleTile[{index}] speed={scrollSpeed:F2} highestTop={highestTop:F2} newY={newY:F2} tileHeight={tileHeight:F2}");
         }
     }
 }
